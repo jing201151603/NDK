@@ -34,6 +34,7 @@ public class AudioPusher extends Pusher {
     @Override
     public void startPush() {
         isPushing = true;
+        pushNative.setAudioOptions(audioParam.getSampleRateInHz(), audioParam.getChannel());
         //启动一个录音子线程
         new Thread(new AudioRecordTask()).start();
     }
