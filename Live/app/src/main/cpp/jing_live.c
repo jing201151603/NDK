@@ -28,6 +28,9 @@ char *rtmp_path;
 #define FALSE	0
 #endif
 
+#define connect_failed  101
+#define init_failed  102
+
 //是否直播
 int is_pushing = FALSE;
 
@@ -36,6 +39,12 @@ faacEncHandle audio_encode_handle;
 
 unsigned long nInputSamples;//输入的采样个数
 unsigned long nMaxOutputBytes;//编码输出之后的字节数
+
+jobject jobj_push_native; //Global ref
+jclass jcls_push_native;
+jmethodID jmid_throw_native_error;
+
+JavaVM *javaVM;
 
 /**
  * 加入RTMPPacket队列，等待发送线程发送
@@ -89,9 +98,9 @@ void add_aac_body(unsigned char *buf, int len) {
     int body_size = 2 + len;
     RTMPPacket *packet = malloc(sizeof(RTMPPacket));
     //RTMPPacket初始化
-    RTMPPacket_Alloc(packet,body_size);
+    RTMPPacket_Alloc(packet, body_size);
     RTMPPacket_Reset(packet);
-    unsigned char * body = packet->m_body;
+    unsigned char *body = packet->m_body;
     //头信息配置
     /*AF 00 + AAC RAW data*/
     body[0] = 0xAF;//10 5 SoundFormat(4bits):10=AAC,SoundRate(2bits):3=44kHz,SoundSize(1bit):1=16-bit samples,SoundType(1bit):1=Stereo sound
@@ -107,9 +116,29 @@ void add_aac_body(unsigned char *buf, int len) {
 }
 
 /**
+ * 获取JavaVM
+ */
+jint JNI_OnLoad(JavaVM *vm, void *reserved) {
+    javaVM = vm;
+    return JNI_VERSION_1_4;
+}
+
+/**
+ * 向java层发送错误信息
+ * @param env
+ * @param code
+ */
+void throwNativeError(JNIEnv *env, int code) {
+//    (*env)->CallVoidMethod(env, jobj_push_native, jmid_throw_native_error, code);
+}
+
+/**
  * 从队列中不断拉取RTMPPacket发送给流媒体服务器）
  */
 void *push_thread(void *arg) {
+    JNIEnv *env;//获取当前线程的JniEnv
+    (*javaVM)->AttachCurrentThread(javaVM, env, NULL);
+
     //建立RTMP连接
     RTMP *rtmp = RTMP_Alloc();
     if (!rtmp) {
@@ -125,12 +154,14 @@ void *push_thread(void *arg) {
     //建立连接
     if (!RTMP_Connect(rtmp, NULL)) {
         LOGE("%s", "rtmp 连接失败");
+        throwNativeError(env, connect_failed);
         goto end;
     }
     //计时
     start_time = RTMP_GetTime();
     if (!RTMP_ConnectStream(rtmp, 0)) { //连接流
         LOGE("%s", "rtmp 连接流失败");
+        throwNativeError(env, connect_failed);
         goto end;
     }
     is_pushing = TRUE;
@@ -166,6 +197,7 @@ void *push_thread(void *arg) {
     free(rtmp_path);
     RTMP_Close(rtmp);
     RTMP_Free(rtmp);
+    (*javaVM)->DetachCurrentThread(javaVM);
     return 0;
 }
 
@@ -176,6 +208,22 @@ void *push_thread(void *arg) {
  */
 JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_startPush
         (JNIEnv *env, jobject jobj, jstring url_jstr) {
+
+    //jobj(PushNative对象),只有jobject才能变成全局引用
+    jobj_push_native = (*env)->NewGlobalRef(env, jobj);
+
+    jclass jcls_push_native_tmp = (*env)->GetObjectClass(env, jobj);
+    jcls_push_native = (*env)->NewGlobalRef(env, jcls_push_native_tmp);
+    if (jcls_push_native_tmp == NULL) {
+        LOGI("%s", "NULL");
+    } else {
+        LOGI("%s", "not NULL");
+    }
+    //PushNative.throwNativeError
+    jmid_throw_native_error = (*env)->GetMethodID(env, jcls_push_native_tmp, "throwNativeError",
+                                                  "(I)V");
+
+
     //初始化的操作
     const char *url_cstr = (*env)->GetStringUTFChars(env, url_jstr, NULL);
     //复制url_cstr内容到rtmp_path
@@ -215,6 +263,9 @@ JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_stopPush
  */
 JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_release
         (JNIEnv *env, jobject jobj) {
+    (*env)->DeleteGlobalRef(env, jcls_push_native);
+    (*env)->DeleteGlobalRef(env, jobj_push_native);
+    (*env)->DeleteGlobalRef(env, jmid_throw_native_error);
 }
 
 /**
@@ -270,6 +321,8 @@ JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_setVideoOptions
     video_encode_handle = x264_encoder_open(&param);
     if (video_encode_handle) {
         LOGI("打开编码器成功...");
+    } else {
+        throwNativeError(env, init_failed);
     }
 
 }
@@ -283,9 +336,11 @@ JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_setVideoOptions
 JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_setAudioOptions
         (JNIEnv *env, jobject jobj, jint sampleRateInHz, jint numChannels) {
 
-    audio_encode_handle = faacEncOpen(sampleRateInHz, numChannels, &nInputSamples, &nMaxOutputBytes);
+    audio_encode_handle = faacEncOpen(sampleRateInHz, numChannels, &nInputSamples,
+                                      &nMaxOutputBytes);
     if (!audio_encode_handle) {
         LOGI("%s", "音频编码器打开失败");
+        throwNativeError(env, init_failed);
         return;
     }
 
@@ -303,6 +358,7 @@ JNIEXPORT void JNICALL Java_com_dxhj_live_jni_PushNative_setAudioOptions
 
     if (!faacEncSetConfiguration(audio_encode_handle, p_config)) {
         LOGI("%s", "音频编码器配置失败");
+        throwNativeError(env, init_failed);
         return;
     }
     LOGI("%s", "音频编码器配置成功");

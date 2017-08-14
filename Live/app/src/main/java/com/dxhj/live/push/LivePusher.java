@@ -6,6 +6,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceHolder.Callback;
 
 import com.dxhj.live.jni.PushNative;
+import com.dxhj.live.listener.OnLiveStateChangeListener;
 import com.dxhj.live.params.AudioParam;
 import com.dxhj.live.params.VideoParam;
 
@@ -47,10 +48,11 @@ public class LivePusher {
     /**
      * 开始推流
      */
-    public void startPush(String url) {
+    public void startPush(String url, OnLiveStateChangeListener onLiveStateChangeListener) {
         videoPusher.startPush();
         audioPusher.startPush();
         pushNative.startPush(url);
+        pushNative.setOnLiveStateChangeListener(onLiveStateChangeListener);
     }
 
 
@@ -61,6 +63,7 @@ public class LivePusher {
         videoPusher.stopPush();
         audioPusher.stopPush();
         pushNative.stopPush();
+        pushNative.removeListener();
     }
 
     /**
