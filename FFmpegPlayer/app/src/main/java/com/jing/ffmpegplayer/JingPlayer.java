@@ -11,7 +11,7 @@ import android.view.Surface;
  */
 public class JingPlayer {
 
-    static{
+    static {
         System.loadLibrary("avutil-54");
         System.loadLibrary("swresample-1");
         System.loadLibrary("avcodec-56");
@@ -23,6 +23,8 @@ public class JingPlayer {
         System.loadLibrary("jing_player");
     }
 
-    public native void render(String input,Surface surface);
+    public native void render(String input, Surface surface);
+
+    public native void sound(String input, String output);
 
 }

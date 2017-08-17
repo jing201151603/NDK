@@ -15,6 +15,10 @@ extern "C" {
 JNIEXPORT void JNICALL
 Java_com_jing_ffmpegplayer_JingPlayer_render(JNIEnv *, jobject, jstring, jobject);
 
+
+JNIEXPORT void JNICALL
+Java_com_jing_ffmpegplayer_JingPlayer_sound(JNIEnv *, jobject, jstring, jstring);
+
 #ifdef __cplusplus
 }
 #endif

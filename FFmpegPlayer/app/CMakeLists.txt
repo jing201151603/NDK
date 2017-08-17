@@ -54,12 +54,7 @@ add_library( avformat-56
 set_target_properties( avformat-56
                        PROPERTIES IMPORTED_LOCATION
                        ${distribution_DIR}/${ANDROID_ABI}/libavformat-56.so )
-add_library( yuv
-             SHARED
-             IMPORTED)
-set_target_properties( yuv
-                       PROPERTIES IMPORTED_LOCATION
-                       ${distribution_DIR}/${ANDROID_ABI}/libyuv.so )
+
 
 #C++11标准
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
@@ -84,6 +79,5 @@ target_link_libraries( jing_player
                        swscale-3
                        avdevice-56
                        avformat-56
-                       yuv
                        ${android-lib}
                        ${log-lib} )

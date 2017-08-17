@@ -25,9 +25,13 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void mPlay(View view) {
-        String input = new File(Environment.getExternalStorageDirectory(), "input.mp4").getAbsolutePath();
-        jingPlayer.render(input, videoView.getHolder().getSurface());
+        /*String input = new File(Environment.getExternalStorageDirectory(), "input.mp4").getAbsolutePath();
+        jingPlayer.render(input, videoView.getHolder().getSurface());*/
 
+        String input = new File(Environment.getExternalStorageDirectory(), "input.mp3").getAbsolutePath();
+        String output = new File(Environment.getExternalStorageDirectory(), "input.pcm").getAbsolutePath();
+
+        jingPlayer.sound(input,output);
     }
 
 }
