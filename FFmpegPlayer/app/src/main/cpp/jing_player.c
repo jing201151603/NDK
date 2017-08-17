@@ -132,7 +132,7 @@ Java_com_jing_ffmpegplayer_JingPlayer_sound(JNIEnv *env, jobject jobj, jstring i
 
     swr_free(&swrCtx);
     avcodec_close(codecCtx);
-    avformat_close_input(pFormatCtx);
+    avformat_close_input(&pFormatCtx);
 
     (*env)->ReleaseStringUTFChars(env,input_jstr,input_cstr);
     (*env)->ReleaseStringUTFChars(env,output_jstr,output_cstr);
